@@ -185,7 +185,7 @@ void flushLED(){  // LEDを点滅させる。(delayを使わずにtiker実行に
   digitalWrite(LED, light_on);
 
   //***Added on 2021.10.27
-  if(motor_running_count++ > 59) {
+  if(motor_running_count++ > 58) { // 500msec x 58 = 29sec.をカウントしたら停止する（リミットスイッチが検出できなかった時のバックアップ停止）
     motor_running_count = 0;
     Serial.print("Time count up and stopped.");
     control_stop();
@@ -274,14 +274,14 @@ void control_open(){
    flag_open_cmd = 1;
   microSec = speedset_OPN; // OPEN側へ動かす
   serv1.attach_ms(20, pwm); 
-  light.attach_ms(500, flushLED); // 200msec周期でflushLED()を実行
+  light.attach_ms(500, flushLED); // 500msec周期でflushLED()を実行
 }
 
 void control_close() {
    flag_close_cmd = 1;
   microSec = speedset_CLS; // CLOSE側へ動かす
   serv1.attach_ms(20, pwm); 
-  light.attach_ms(500, flushLED); // 1000msec周期でflushLED()を実行
+  light.attach_ms(500, flushLED); // 500msec周期でflushLED()を実行
 }
 
 void control_stop(){  // 停止させる
