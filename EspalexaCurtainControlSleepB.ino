@@ -96,12 +96,12 @@ void setup(){
     setTime(mktime(&localTime)+JST);
     Serial.printf("%02d:%02d:%02d\n", hour(), minute(), second());
 
+timecheck:
     //*** Added 2021.11.8 **********************************        
     if( !timecheck() ) {//終了設定時刻を過ぎていることを確認できればカーテン動作済みのフラグはクリアし、次の開始時刻に備える。
       flag_curtain_control_done = false;
     }
 
-timecheck:
     //*** Added 2021.11.8 **********************************
     //現在時刻が開始～終了設定時刻内であればメインタスクの実行ループを続けるが、例外的にカーテン動作済みのフラグが立っている場合は実行しない。
     while( (timecheck() || flag_interrupt) && !flag_curtain_control_done ) {
@@ -137,10 +137,10 @@ timecheck:
       }//メインタスクの初期設定ここまで
       
       //--------メインタスクのループ実行--------------------------------------
-      for(int i=0;i<10;i++){//10回で10分間繰り返すループ
-        Serial.printf("%d:espalexa is running... %02d:%02d:%02d\n", i, hour(), minute(), second());
-        while(!flag_curtain_control_done){ // Added 2021.11.8 カーテン動作完了した場合はespalexa指令待ちのループをスキップする。
-          for(int j=0;j<120;j++){//60秒間繰り返すループ
+      for( int i=0; i<10; i++ ) {//10回で10分間繰り返すループ
+        if( !flag_curtain_control_done ){ // Added 2021.11.8 カーテン動作完了した場合はespalexa指令待ちのループをスキップする。
+          Serial.printf("%d:espalexa is running... %02d:%02d:%02d\n", i, hour(), minute(), second());
+          for( int j=0; j<120; j++ ){//60秒間繰り返すループ
               espalexa.loop();
               delay(500);
           }
