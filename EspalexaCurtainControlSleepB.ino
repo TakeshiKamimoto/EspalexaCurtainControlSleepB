@@ -1,3 +1,5 @@
+// Rev.B3 2021.11.8, alexa指令により動作完了したら終了時刻を待たずにスリープに移行させる。
+
 #include <Espalexa.h>
 #include <time.h>
 #include <TimeLib.h>
@@ -7,7 +9,7 @@
 
 #define START1  5   //朝の開始時刻 ( 5 は 午前5時を示す）
 #define END1    7   //朝の終了時刻
-#define START2  17  //夕の開始時刻
+#define START2  16  //夕の開始時刻
 #define END2    18  //夕の終了時刻
 
 #define JST     3600*9
@@ -34,9 +36,10 @@ boolean  flag_close_cmd = 0;
 boolean  flag_open_cmd = 0;
 boolean  flag_interrupt = false; //****Modified 2021.10.9
 
-RTC_DATA_ATTR int bootCount = 0;  //このRTCメモリの変数はスリープ状態からのリブート時にはクリアされない。スリープした回数を数える。
+// このRTCメモリの変数はスリープ状態からのリブート時にはクリアされない。
+RTC_DATA_ATTR int bootCount = 0;  //スリープした回数を数える。
 RTC_DATA_ATTR boolean INIT = true;
-
+RTC_DATA_ATTR boolean flag_curtain_control_done = false;  //***Added 2021.11.8
 
 
 // prototypes
@@ -47,6 +50,7 @@ void control_open();
 void control_close();
 void IRAM_ATTR closeSwitchOn();
 void IRAM_ATTR openSwitchOn();
+boolean timecheck(); // Added 2021.11.8
 
 Espalexa espalexa;
 Ticker serv1;
@@ -60,7 +64,7 @@ void setup(){
   boolean flag_loop_init = true;
   boolean flag_initialTimeSynchronized;
   boolean flag_mainTask_executed = false;
-    
+     
   Serial.begin(115200);
   delay(1000); //Take some time to open up the Serial Monitor
   
@@ -91,9 +95,16 @@ void setup(){
     getLocalTime(&localTime);
     setTime(mktime(&localTime)+JST);
     Serial.printf("%02d:%02d:%02d\n", hour(), minute(), second());
-    
+
+    //*** Added 2021.11.8 **********************************        
+    if( !timecheck() ) {//終了設定時刻を過ぎていることを確認できればカーテン動作済みのフラグはクリアし、次の開始時刻に備える。
+      flag_curtain_control_done = false;
+    }
+
 timecheck:
-    while((START1<=hour())^(hour()<END1)^(START1<END1) || (START2<=hour())^(hour()<END2)^(START2<END2) || flag_interrupt) {
+    //*** Added 2021.11.8 **********************************
+    //現在時刻が開始～終了設定時刻内であればメインタスクの実行ループを続けるが、例外的にカーテン動作済みのフラグが立っている場合は実行しない。
+    while( (timecheck() || flag_interrupt) && !flag_curtain_control_done ) {
       //--------メインタスクの実行--------------------------------------   
       if(flag_loop_init) {//メインタスクの初期設定
                 
@@ -127,12 +138,14 @@ timecheck:
       
       //--------メインタスクのループ実行--------------------------------------
       for(int i=0;i<10;i++){//10回で10分間繰り返すループ
-        Serial.printf("espalexa is running... %02d:%02d:%02d\n", hour(), minute(), second());
-        for(int j=0;j<120;j++){//60秒間繰り返すループ
-          espalexa.loop();
+        Serial.printf("%d:espalexa is running... %02d:%02d:%02d\n", i, hour(), minute(), second());
+        while(!flag_curtain_control_done){ // Added 2021.11.8 カーテン動作完了した場合はespalexa指令待ちのループをスキップする。
+          for(int j=0;j<120;j++){//60秒間繰り返すループ
+              espalexa.loop();
               delay(500);
+          }
         }
-      }
+      }  
       flag_mainTask_executed = true;
       flag_interrupt = false; //****Modified 2021.10.9
       
@@ -170,7 +183,11 @@ void loop(){
   //This is not going to be called
 }
 
-
+// *** Added 2021.11.8 ********************************************
+boolean timecheck(){
+  //演算子の優先順位に注意！ 優先順に < → ^ → ||   
+  return START1<=hour() ^ hour()<END1 ^ START1<END1 || START2<=hour() ^ hour()<END2 ^ START2<END2;
+}
 
 
 void checkLED(){  // LEDをフラッシュさせる。(delayを使わずにtiker実行により点滅タイミングを作る)
@@ -186,8 +203,8 @@ void flushLED(){  // LEDを点滅させる。(delayを使わずにtiker実行に
 
   //***Added on 2021.10.27
   if(motor_running_count++ > 58) { // 500msec x 58 = 29sec.をカウントしたら停止する（リミットスイッチが検出できなかった時のバックアップ停止）
-    motor_running_count = 0;
-    Serial.print("Time count up and stopped.");
+    // deleted 2021.11.8
+    Serial.println("Time count up and stopped.");
     control_stop();
   }
 }
@@ -275,6 +292,7 @@ void control_open(){
   microSec = speedset_OPN; // OPEN側へ動かす
   serv1.attach_ms(20, pwm); 
   light.attach_ms(500, flushLED); // 500msec周期でflushLED()を実行
+  motor_running_count = 0;//***Added 2021.11.8
 }
 
 void control_close() {
@@ -282,6 +300,7 @@ void control_close() {
   microSec = speedset_CLS; // CLOSE側へ動かす
   serv1.attach_ms(20, pwm); 
   light.attach_ms(500, flushLED); // 500msec周期でflushLED()を実行
+  motor_running_count = 0;//***Added 2021.11.8
 }
 
 void control_stop(){  // 停止させる
@@ -289,4 +308,5 @@ void control_stop(){  // 停止させる
   serv1.detach();
   light.detach();
   digitalWrite(LED,LOW);
+  flag_curtain_control_done = true; // Added 2021.11.8
 }
