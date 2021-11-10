@@ -223,6 +223,11 @@ void timesynch() {
   } 
   else {
     Serial.println("Connected to WiFi.");
+    // *** Added. 2021.11.10 ***************
+    for (int i=0; i<5; i++) { 
+      checkLED();
+      delay(50);
+    }
   }
   
   struct tm localTime;
