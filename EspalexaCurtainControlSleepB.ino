@@ -1,3 +1,4 @@
+// Rev.B4 2021.11.11, サーボモータの電源ラインにトランジスタスイッチを追加。
 // Rev.B3 2021.11.8, alexa指令により動作完了したら終了時刻を待たずにスリープに移行させる。
 
 #include <Espalexa.h>
@@ -21,6 +22,7 @@
 #define PWM_OUT   15
 #define CLS_SW    12 // Left switch (Normally closed contact)
 #define OPN_SW     5 // Right switch (Normally closed contact)
+#define SRVPWR     2 // Added. 2021.11.11
 
 const int deg000 = 500; // Servomotor control signal pulse width minimum [microSec]
 const int deg180 = 2400; // Servomotor control signal pulse width maximum [microSec]
@@ -69,6 +71,7 @@ void setup(){
   delay(1000); //Take some time to open up the Serial Monitor
   
   pinMode(LED,OUTPUT);
+  pinMode(SRVPWR,OUTPUT); //Added 2021.11.11
 
   // GPIO割り込み発生時の処理 //****Modified 2021.10.9
   esp_sleep_wakeup_cause_t wakeup_reason;
@@ -137,15 +140,19 @@ timecheck:
       }//メインタスクの初期設定ここまで
       
       //--------メインタスクのループ実行--------------------------------------
+      
       for( int i=0; i<10; i++ ) {//10回で10分間繰り返すループ
-        if( !flag_curtain_control_done ){ // Added 2021.11.8 カーテン動作完了した場合はespalexa指令待ちのループをスキップする。
           Serial.printf("%d:espalexa is running... %02d:%02d:%02d\n", i, hour(), minute(), second());
-          for( int j=0; j<120; j++ ){//60秒間繰り返すループ
+          if( !flag_curtain_control_done ){ // Added 2021.11.8 カーテン動作完了した場合はespalexa指令待ちのループをスキップする。
+            for( int j=0; j<120; j++ ){//60秒間繰り返すループ
               espalexa.loop();
               delay(500);
+            }
+          } else {
+            Serial.println("Skip espalexa execution loop");
           }
-        }
-      }  
+      }
+        
       flag_mainTask_executed = true;
       flag_interrupt = false; //****Modified 2021.10.9
       
@@ -295,6 +302,7 @@ void firstLightChanged(uint8_t brightness) {
 void control_open(){
    flag_open_cmd = 1;
   microSec = speedset_OPN; // OPEN側へ動かす
+  digitalWrite(SRVPWR, HIGH); // Added. 2021.11.11
   serv1.attach_ms(20, pwm); 
   light.attach_ms(500, flushLED); // 500msec周期でflushLED()を実行
   motor_running_count = 0;//***Added 2021.11.8
@@ -303,6 +311,7 @@ void control_open(){
 void control_close() {
    flag_close_cmd = 1;
   microSec = speedset_CLS; // CLOSE側へ動かす
+  digitalWrite(SRVPWR, HIGH); // Added. 2021.11.11
   serv1.attach_ms(20, pwm); 
   light.attach_ms(500, flushLED); // 500msec周期でflushLED()を実行
   motor_running_count = 0;//***Added 2021.11.8
@@ -313,5 +322,6 @@ void control_stop(){  // 停止させる
   serv1.detach();
   light.detach();
   digitalWrite(LED,LOW);
+  digitalWrite(SRVPWR, LOW); // Added. 2021.11.11
   flag_curtain_control_done = true; // Added 2021.11.8
 }
