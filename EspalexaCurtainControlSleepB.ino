@@ -1,3 +1,4 @@
+// Rev.B5 2021.11.19, espalexaのループ周期を500msecから250msへ変更
 // Rev.B4 2021.11.11, サーボモータの電源ラインにトランジスタスイッチを追加。
 // Rev.B3 2021.11.8, alexa指令により動作完了したら終了時刻を待たずにスリープに移行させる。
 
@@ -144,9 +145,9 @@ timecheck:
       for( int i=0; i<10; i++ ) {//10回で10分間繰り返すループ
           Serial.printf("%d:espalexa is running... %02d:%02d:%02d\n", i, hour(), minute(), second());
           if( !flag_curtain_control_done ){ // Added 2021.11.8 カーテン動作完了した場合はespalexa指令待ちのループをスキップする。
-            for( int j=0; j<120; j++ ){//60秒間繰り返すループ
+            for( int j=0; j<240; j++ ){//60秒間繰り返すループ
               espalexa.loop();
-              delay(500);
+              delay(250);
             }
           } else {
             Serial.println("Skip espalexa execution loop");
